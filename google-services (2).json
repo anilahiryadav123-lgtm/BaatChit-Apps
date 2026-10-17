@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "909202072177",
+    "firebase_url": "https://baatchit-87420-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "baatchit-87420",
+    "storage_bucket": "baatchit-87420.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909202072177:android:f35622396ada7d5db631d0",
+        "android_client_info": {
+          "package_name": "com.baatchit.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPrOYlgnaJ_TILyNF083bc-dEIIZXirdU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
