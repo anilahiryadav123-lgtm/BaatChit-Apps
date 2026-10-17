@@ -1,0 +1,93 @@
+name: BaatChit APK + Push Server
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  push:
+    name: Push server (Cloudflare, free)
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip project
+        run: for z in BaatChit-GitHub*.zip; do [ -f "$z" ] && unzip -o -q "$z" baatchit-src.zip || true; done; if [ -f baatchit-src.zip ]; then unzip -o -q baatchit-src.zip; fi
+      - name: Deploy push server
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          APP_KEY_SECRET: ${{ secrets.APP_KEY }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$FIREBASE_SA" ]; then
+            echo "::warning::Push server ke secrets nahi mile (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, FIREBASE_SERVICE_ACCOUNT). APK bina push ke banega."
+            exit 0
+          fi
+          KEY="${APP_KEY_SECRET:-bc-${{ github.repository_id }}-push}"
+          cd worker
+          npx --yes wrangler@3 deploy 2>&1 | tee out.txt
+          URL=$(grep -o 'https://[a-zA-Z0-9.-]*\.workers\.dev' out.txt | head -1)
+          printf '%s' "$FIREBASE_SA" | npx --yes wrangler@3 secret put FIREBASE_SA
+          printf '%s' "$KEY" | npx --yes wrangler@3 secret put APP_KEY
+          echo "Push server URL: $URL"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+  apk:
+    name: Build APK
+    needs: push
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare project
+        env:
+          PUSH_URL_SECRET: ${{ secrets.PUSH_URL }}
+          APP_KEY_SECRET: ${{ secrets.APP_KEY }}
+        run: |
+          for z in BaatChit-GitHub*.zip; do [ -f "$z" ] && unzip -o -q "$z" baatchit-src.zip || true; done; if [ -f baatchit-src.zip ]; then unzip -o -q baatchit-src.zip; fi
+          test -d android || { echo "::error::BaatChit-GitHub.zip (ya baatchit-src.zip) repo me upload karein"; exit 1; }
+          if [ -f index.html ]; then cp index.html android/app/src/main/assets/www/index.html; echo "Naya index.html use hua"; fi
+          for g in google-services*.json; do [ -f "$g" ] && cp "$g" android/app/google-services.json && echo "Using $g"; done
+          test -f android/app/google-services.json || { echo "::error::google-services.json upload karein (Firebase > Project settings > Android app com.baatchit.app)"; exit 1; }
+          grep -q '"com.baatchit.app"' android/app/google-services.json || { echo "::error::google-services.json me package name com.baatchit.app hona chahiye"; exit 1; }
+          URL="${{ needs.push.outputs.url }}"
+          [ -z "$URL" ] && URL="$PUSH_URL_SECRET"
+          KEY="${APP_KEY_SECRET:-bc-${{ github.repository_id }}-push}"
+          sed -i "s#__PUSH_URL__#${URL}#g; s#__APP_KEY__#${KEY}#g" android/app/src/main/assets/www/index.html
+          echo "Push URL in app: ${URL:-'(none)'}"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build APK
+        run: gradle -p android assembleRelease --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk "BaatChit-v${{ github.run_number }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaatChit-APK
+          path: BaatChit-v${{ github.run_number }}.apk
+
+      - name: Release (download link)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: BaatChit v${{ github.run_number }}
+          body: "BaatChit APK · phone me download karke install karein"
+          files: BaatChit-v${{ github.run_number }}.apk
