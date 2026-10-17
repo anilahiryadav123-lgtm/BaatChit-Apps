@@ -18,6 +18,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unzip project
         run: for z in BaatChit-GitHub*.zip; do [ -f "$z" ] && unzip -o -q "$z" baatchit-src.zip || true; done; if [ -f baatchit-src.zip ]; then unzip -o -q baatchit-src.zip; fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Deploy push server
         id: deploy
         env:
@@ -31,11 +34,18 @@ jobs:
             exit 0
           fi
           KEY="${APP_KEY_SECRET:-bc-${{ github.repository_id }}-push}"
+          export CLOUDFLARE_API_TOKEN="$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]')"
+          export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')"
+          echo "Token length: ${#CLOUDFLARE_API_TOKEN}  (Account ID length: ${#CLOUDFLARE_ACCOUNT_ID}, 32 hona chahiye)"
+          echo "Token check (account):"
+          curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/tokens/verify" | head -c 300; echo
+          echo "Token check (user):"
+          curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/user/tokens/verify" | head -c 300; echo
           cd worker
-          npx --yes wrangler@3 deploy 2>&1 | tee out.txt
+          npx --yes wrangler@4 deploy 2>&1 | tee out.txt
           URL=$(grep -o 'https://[a-zA-Z0-9.-]*\.workers\.dev' out.txt | head -1)
-          printf '%s' "$FIREBASE_SA" | npx --yes wrangler@3 secret put FIREBASE_SA
-          printf '%s' "$KEY" | npx --yes wrangler@3 secret put APP_KEY
+          printf '%s' "$FIREBASE_SA" | npx --yes wrangler@4 secret put FIREBASE_SA
+          printf '%s' "$KEY" | npx --yes wrangler@4 secret put APP_KEY
           echo "Push server URL: $URL"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
