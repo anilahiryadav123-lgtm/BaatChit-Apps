@@ -42,6 +42,7 @@ jobs:
         env:
           PUSH_URL: ${{ needs.push.outputs.url || secrets.PUSH_URL }}
           PUSH_KEY: ${{ secrets.APP_KEY || format('bc-{0}-push', github.repository_id) }}
+          DEEPAR_WEB_KEY: ${{ secrets.DEEPAR_WEB_KEY }}
         run: |
           for z in BaatChit-GitHub*.zip; do [ -f "$z" ] && unzip -o -q "$z" baatchit-src.zip || true; done; if [ -f baatchit-src.zip ]; then unzip -o -q baatchit-src.zip; fi
           test -d android || { echo "::error::BaatChit-GitHub.zip repo me upload karein"; exit 1; }
