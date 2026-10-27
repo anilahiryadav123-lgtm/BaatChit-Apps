@@ -57,7 +57,11 @@ jobs:
           gradle-version: '8.7'
 
       - name: Build APK
-        run: gradle -p android assembleRelease --no-daemon --stacktrace
+        env:
+          DEEPAR_KEY: ${{ secrets.DEEPAR_KEY }}
+        run: |
+          if [ -z "$DEEPAR_KEY" ]; then echo "::warning::DEEPAR_KEY secret nahi mila - face filters band rahenge (normal camera chalega)"; echo "### ⚠️ DEEPAR_KEY secret add karein (Settings > Secrets > Actions)" >> "$GITHUB_STEP_SUMMARY"; else echo "### ✅ DeepAR face filters ON" >> "$GITHUB_STEP_SUMMARY"; fi
+          gradle -p android assembleRelease --no-daemon --stacktrace
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/release/app-release.apk "BaatChit-v${{ github.run_number }}.apk"
@@ -74,4 +78,3 @@ jobs:
           name: BaatChit v${{ github.run_number }}
           body: "BaatChit APK · phone me download karke install karein"
           files: BaatChit-v${{ github.run_number }}.apk
-          
